@@ -24,7 +24,6 @@ interface Product {
     sizeName: string;
 }
 
-// Custom arrow component for slick slider
 const NextArrow = (props: any) => {
     const { onClick } = props;
     return (
@@ -76,6 +75,7 @@ const Body: React.FC = () => {
     const [product, setProduct] = useState<Product | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+    const [selectedQuantity, setSelectedQuantity] = useState<number>(1);
 
     useEffect(() => {
         if (id) {
@@ -95,6 +95,26 @@ const Body: React.FC = () => {
         }
     }, [id]);
 
+    const handleAddToCart = async () => {
+        if (product && authState.user) {
+            try {
+                const response = await axios.post('/api/cart', {
+                    userid: authState.user.userid,
+                    products: [{ productid: id, quantity: selectedQuantity }]
+                });
+                if (response.status === 200) {
+                    alert('Product added to cart successfully');
+                    router.push('/dashboard'); // Redirect to cart page or show a success message
+                }
+            } catch (error) {
+                console.error('Error adding product to cart:', error);
+                alert('Failed to add product to cart');
+            }
+        } else {
+            alert('Please log in to add products to your cart');
+        }
+    };
+
     if (loading) {
         return <div><Preloader /></div>;
     }
@@ -106,37 +126,6 @@ const Body: React.FC = () => {
     if (!product) {
         return <div>No product found.</div>;
     }
-
-    const updatePageRedirection = () => {
-        if (id) {
-            router.push(`/update-page/${id}`);
-        } else {
-            console.error("Product Master ID is undefined");
-        }
-    };
-
-    const handleDeleteProduct = async () => {
-        if (confirm('Are you sure you want to delete this product?')) {
-            try {
-                const response = await axios.delete('/api/products', {
-                    data: {
-                        productmasterid: product?.productmasterid,
-                        deletedby: authState.user?.userid
-                    }
-                });
-
-                if (response.status === 200) {
-                    alert('Product deleted successfully.');
-                    router.push('/dashboard');
-                } else {
-                    alert(`Failed to delete product: ${response.data.message}`);
-                }
-            } catch (error) {
-                console.error('Error deleting product:', error);
-                alert('An error occurred while deleting the product.');
-            }
-        }
-    };
 
     // Carousel settings
     const settings = {
@@ -209,24 +198,24 @@ const Body: React.FC = () => {
                             </p>
                         </div>
                         <div>
-                                <span className="font-bold text-gray-700">Select Quantity:</span>
-                                <input
-                                    type="number"
-                                    className="h-10 w-20 border rounded-lg text-center mt-2"
-                                    max={product.quantity}
-                                    min={1}
-                                    defaultValue={1}
-                                />
-                            </div>
+                            <span className="font-bold text-gray-700">Select Quantity:</span>
+                            <input
+                                type="number"
+                                className="h-10 w-20 border rounded-lg text-center mt-2"
+                                max={product.quantity}
+                                min={1}
+                                value={selectedQuantity}
+                                onChange={(e) => setSelectedQuantity(parseInt(e.target.value))}
+                            />
+                        </div>
                         {authState.isAuthenticated && (
                             <div className="mt-4">
                                 <button
                                     className="bg-blue-500 text-white py-2 px-4 rounded-full font-bold hover:bg-blue-600"
-                                    onClick={updatePageRedirection}
+                                    onClick={handleAddToCart}
                                 >
                                     Add to cart
                                 </button>
-                                
                             </div>
                         )}
                     </div>

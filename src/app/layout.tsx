@@ -9,7 +9,7 @@ import Footer from '@/components/footer/footer';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: "FabricShop Admin",
+  title: "FabricShop",
   description: "An E-Commerce website built with Next.js and Tailwind CSS",
 };
 

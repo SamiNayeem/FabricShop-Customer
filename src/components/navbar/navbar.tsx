@@ -18,7 +18,7 @@ const Navbar = () => {
   
   useEffect(() => {
     
-    setCartItemCount(3); // Replace this with actual logic
+    setCartItemCount(0); // Replace this with actual logic
   }, []);
 
   return (
