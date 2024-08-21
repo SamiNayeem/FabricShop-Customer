@@ -5,12 +5,12 @@ import Preloader from '@/components/preloader/preloader';
 
 interface AuthState {
   isAuthenticated: boolean;
-  user: { username: string; userid: number; image?: string } | null;
+  user: { username: string; userid: number; email: string; image?: string } | null;
 }
 
 interface AuthContextProps {
   authState: AuthState;
-  login: (user: { username: string; userid: number; image?: string }) => void;
+  login: (user: { username: string; userid: number; email: string; image?: string }) => void;
   logout: () => void;
 }
 
@@ -26,7 +26,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const router = useRouter();
 
-  // Load auth state from localStorage when the component mounts
   useEffect(() => {
     const storedAuthState = localStorage.getItem('authState');
     if (storedAuthState) {
@@ -36,23 +35,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsInitialized(true); // Mark as initialized
   }, []);
-  
 
-  const login = (user: { username: string; userid: number; image?: string }) => {
-    console.log('User logging in:', user); // Check what is being passed
+  const login = (user: { username: string; userid: number; email: string; image?: string }) => {
+    console.log('User logging in:', user);  // Check if the email is correctly logged here
     const newAuthState = {
       isAuthenticated: true,
       user: {
         ...user,
-        image: user.image || '../images/default_user.png', // Ensure a default image is set if undefined
+        image: user.image || '/images/default_user.png',  // Fallback for the image
       },
     };
-    console.log('New authState:', newAuthState); // Check the authState after assignment
+    console.log('New authState:', newAuthState);  // Ensure the email is part of the auth state
     setAuthState(newAuthState);
-    localStorage.setItem('authState', JSON.stringify(newAuthState)); // Save to localStorage
-    router.push('/dashboard'); // Redirect to dashboard after login
+    localStorage.setItem('authState', JSON.stringify(newAuthState));  // Store in localStorage
+    router.push('/dashboard');  // Redirect to dashboard after login
   };
   
+
   const logout = () => {
     setAuthState(defaultAuthState);
     localStorage.removeItem('authState'); // Remove from localStorage
@@ -61,7 +60,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   if (!isInitialized) {
     // Optionally, you can return a loading indicator while the auth state is being initialized
-    return <div><Preloader/></div>;
+    return <div><Preloader /></div>;
   }
 
   return (

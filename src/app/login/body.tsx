@@ -14,16 +14,21 @@ const LoginForm = () => {
 
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-
+    
         try {
             const { data } = await axios.post('/api/login', {
                 username,
                 userpassword: password,
             });
-
-            console.log('API Response:', data); // Log the full response
-            localStorage.setItem('token', data.token);
-            login({ username, userid: data.userid }); // Updated to include userid
+            
+            login({ 
+                username, 
+                userid: data.userid, 
+                email: data.email, 
+                image: data.image 
+            });
+            
+            
             console.log('Login successful');
             toast.success("Login successful!", {
                 position: "top-center",
@@ -36,7 +41,7 @@ const LoginForm = () => {
                 theme: "light",
                 transition: Slide
             });
-
+    
             // Redirect to dashboard or another page upon successful login
             router.push('/dashboard');
         } catch (error: any) {
@@ -54,6 +59,7 @@ const LoginForm = () => {
             });
         }
     };
+    
 
     return (
         <form onSubmit={handleSubmit} className="mt-4">

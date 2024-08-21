@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 const pool = require('@/config/db');
 
 type CheckoutRequest = {
-    cartId: number;
     userId: number;
     paymentMethodId: number;
     transactionId?: string;
@@ -10,10 +9,10 @@ type CheckoutRequest = {
 };
 
 export async function POST(req: NextRequest) {
-    const { cartId, userId, paymentMethodId, transactionId, shippingMethodId } = await req.json() as CheckoutRequest;
+    const { userId, paymentMethodId, transactionId, shippingMethodId } = await req.json() as CheckoutRequest;
 
-    if (!cartId || !userId || !paymentMethodId || !shippingMethodId) {
-        return NextResponse.json({ message: 'Cart ID, User ID, Payment Method ID, and Shipping Method ID are required' }, { status: 400 });
+    if (!userId || !paymentMethodId || !shippingMethodId) {
+        return NextResponse.json({ message: 'User ID, Payment Method ID, and Shipping Method ID are required' }, { status: 400 });
     }
 
     const connection = await pool.getConnection();
@@ -21,15 +20,26 @@ export async function POST(req: NextRequest) {
     try {
         await connection.beginTransaction();
 
+        // Fetch Cart Master ID
+        const [cartMasterRows] = await connection.query(
+            'SELECT id FROM cartmaster WHERE userid = ?',
+            [userId]
+        );
+        if (cartMasterRows.length === 0) {
+            await connection.rollback();
+            return NextResponse.json({ message: 'Cart not found' }, { status: 404 });
+        }
+        const cartMasterId = cartMasterRows[0].id;
+
         // Fetch cart details
         const [cartDetails] = await connection.query(
             'SELECT * FROM cartdetails WHERE CartMasterId = ?',
-            [cartId]
+            [cartMasterId]
         );
 
         if (cartDetails.length === 0) {
             await connection.rollback();
-            return NextResponse.json({ message: 'Cart not found' }, { status: 404 });
+            return NextResponse.json({ message: 'Cart details not found' }, { status: 404 });
         }
 
         // Calculate total amount from cart details
@@ -76,9 +86,9 @@ export async function POST(req: NextRequest) {
         `;
         await connection.query(insertShippingInfoQuery, [orderMasterId, shippingMethodId]);
 
-        // Delete the cart and its details
-        await connection.query('DELETE FROM cartdetails WHERE CartMasterId = ?', [cartId]);
-        await connection.query('DELETE FROM cartmaster WHERE id = ?', [cartId]);
+        // Clear the cart
+        await connection.query('DELETE FROM cartdetails WHERE CartMasterId = ?', [cartMasterId]);
+        await connection.query('DELETE FROM cartmaster WHERE id = ?', [cartMasterId]);
 
         await connection.commit();
         return NextResponse.json({ message: 'Checkout successful' }, { status: 200 });
@@ -90,6 +100,7 @@ export async function POST(req: NextRequest) {
         connection.release();
     }
 }
+
 
 export async function GET(req: NextRequest) {
     try {

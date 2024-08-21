@@ -7,8 +7,7 @@ const pool = mysql.createPool({
     password: '1234',
     database: 'fabricshop',
     waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
+
   });
   
   module.exports = pool;

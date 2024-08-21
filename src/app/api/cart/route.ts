@@ -117,10 +117,10 @@ export async function POST(req: NextRequest) {
 // Update product quantity in the cart
 export async function PUT(req: NextRequest) {
     try {
-        const { userid, cartDetailId, newQuantity } = await req.json() as UserRequest;
+        const { userid, cartDetailId, newQuantity, newTotalPrice } = await req.json();
 
-        if (!userid || !cartDetailId || !newQuantity) {
-            return NextResponse.json({ error: 'UserId, CartDetailId, and NewQuantity are required' }, { status: 400 });
+        if (!userid || !cartDetailId || !newQuantity || !newTotalPrice) {
+            return NextResponse.json({ error: 'UserId, CartDetailId, NewQuantity, and NewTotalPrice are required' }, { status: 400 });
         }
 
         const connection = await pool.getConnection();
@@ -128,37 +128,12 @@ export async function PUT(req: NextRequest) {
         try {
             await connection.beginTransaction();
 
-            const [cartDetailRows] = await connection.query(
-                'SELECT * FROM cartdetails WHERE id = ? AND CartMasterId IN (SELECT id FROM cartmaster WHERE userid = ?)',
-                [cartDetailId, userid]
-            );
-
-            if (cartDetailRows.length === 0) {
-                await connection.rollback();
-                return NextResponse.json({ message: 'Cart detail not found for the user' }, { status: 404 });
-            }
-
-            const productid = cartDetailRows[0].ProductMasterId;
-
-            const [priceRows] = await connection.query(
-                'SELECT price FROM productdetails WHERE ProductMasterId = ?',
-                [productid]
-            );
-
-            if (priceRows.length === 0) {
-                await connection.rollback();
-                return NextResponse.json({ message: 'Product price not found' }, { status: 404 });
-            }
-
-            const price = priceRows[0].price;
-            const totalPrice = price * newQuantity;
-
             const updateCartDetailQuery = `
                 UPDATE cartdetails
                 SET Quantity = ?, TotalPrice = ?, UpdatedAt = NOW()
-                WHERE id = ?
+                WHERE id = ? AND CartMasterId IN (SELECT id FROM cartmaster WHERE userid = ?)
             `;
-            const updateCartDetailValues = [newQuantity, totalPrice, cartDetailId];
+            const updateCartDetailValues = [newQuantity, newTotalPrice, cartDetailId, userid];
 
             await connection.query(updateCartDetailQuery, updateCartDetailValues);
 
@@ -176,6 +151,7 @@ export async function PUT(req: NextRequest) {
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
+
 
 // Delete a product from the cart
 export async function DELETE(req: NextRequest) {

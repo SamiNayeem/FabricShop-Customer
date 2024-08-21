@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useAuth } from "@/app/context/auth-context";
+import Preloader from "@/components/preloader/preloader";
+import Router, { useRouter } from "next/navigation";
 
 interface CartItem {
   cart_detail_id: number;
   product_master_id: number;
   product_name: string;
-  product_image: string; // Image URL fetched from the database
+  product_image: string;
   product_code: string;
   product_description: string;
   category: string;
@@ -20,11 +22,15 @@ interface CartItem {
 
 export default function Body() {
   const { authState } = useAuth();
+  const router = useRouter();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [discount, setDiscount] = useState(0);
   const [totalPrice, setTotalPrice] = useState(0);
+  const [subtotal, setSubtotal] = useState(0);
+  const [totalDiscount, setTotalDiscount] = useState(0);
+  const [couponCode, setCouponCode] = useState('');
 
   useEffect(() => {
     if (authState.isAuthenticated && authState.user) {
@@ -36,7 +42,7 @@ export default function Body() {
     try {
       const response = await axios.get(`/api/cart?userid=${authState.user?.userid}`);
       setCartItems(response.data);
-      calculateTotalPrice(response.data);
+      calculateSubtotal(response.data);
       setLoading(false);
     } catch (error) {
       console.error("Error fetching cart items:", error);
@@ -45,9 +51,14 @@ export default function Body() {
     }
   };
 
-  const calculateTotalPrice = (items: CartItem[]) => {
+  const handleCheckout = () => {
+    router.push(`/checkout/${authState.user?.userid}`);
+  };
+
+  const calculateSubtotal = (items: CartItem[]) => {
     const total = items.reduce((sum, item) => sum + item.TotalPrice, 0);
-    setTotalPrice(total);
+    setSubtotal(total);
+    setTotalPrice(total - totalDiscount); // Apply any existing discount
   };
 
   const handleQuantityChange = async (itemId: number, newQuantity: number) => {
@@ -67,7 +78,7 @@ export default function Body() {
             : item
         )
       );
-      calculateTotalPrice(cartItems);
+      calculateSubtotal(cartItems);
     } catch (error) {
       console.error("Error updating cart item quantity:", error);
       setError("Failed to update cart item quantity");
@@ -80,22 +91,41 @@ export default function Body() {
         data: { userid: authState.user?.userid, cartDetailId: itemId },
       });
 
-      setCartItems((prevItems) => prevItems.filter((item) => item.cart_detail_id !== itemId));
-      calculateTotalPrice(cartItems.filter((item) => item.cart_detail_id !== itemId));
+      const updatedCartItems = cartItems.filter((item) => item.cart_detail_id !== itemId);
+      setCartItems(updatedCartItems);
+      calculateSubtotal(updatedCartItems);
     } catch (error) {
       console.error("Error removing item from cart:", error);
       setError("Failed to remove item from cart");
     }
   };
 
-  const handleApplyDiscount = (e: React.FormEvent) => {
-    e.preventDefault();
-    const discountedPrice = totalPrice * ((100 - discount) / 100);
-    setTotalPrice(discountedPrice);
-  };
+  // const handleApplyDiscount = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   try {
+  //     const response = await axios.post('/api/discount-coupon', {
+  //       userid: authState.user?.userid,
+  //       couponcode: couponCode,
+  //     });
+
+  //     if (response.data && response.data.discountpercentage) {
+  //       setDiscount(response.data.discountpercentage);
+  //       const discountAmount = subtotal * (response.data.discountpercentage / 100);
+  //       setTotalDiscount(discountAmount);
+  //       setTotalPrice(subtotal - discountAmount);
+  //     } else {
+  //       setDiscount(0);
+  //       setTotalDiscount(0);
+  //       alert('Invalid coupon code');
+  //     }
+  //   } catch (error) {
+  //     console.error('Error applying coupon:', error);
+  //     alert('Failed to apply coupon');
+  //   }
+  // };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <div><Preloader/></div>;
   }
 
   if (error) {
@@ -110,8 +140,6 @@ export default function Body() {
     return <div className="h-screen w-full">Your cart is empty.</div>;
   }
 
-  const subtotal = totalPrice;
-
   return (
     <section className="bg-white py-8 antialiased">
       <div className="mx-auto max-w-screen-xl px-4 2xl:px-0">
@@ -120,7 +148,7 @@ export default function Body() {
           <div className="mx-auto w-full flex-none lg:max-w-2xl xl:max-w-4xl">
             <div className="space-y-6">
               {cartItems.map((item) => (
-                <div key={item.cart_detail_id} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm md:p-6">
+                <div key={item.cart_detail_id} className="rounded-lg border border-gray-200 bg-white p-4 shadow-lg md:p-6">
                   <div className="space-y-4 md:flex md:items-center md:justify-between md:gap-6 md:space-y-0">
                     <a href="#" className="shrink-0 md:order-1">
                       <img className="h-60 object-contain" src={item.product_image} alt={item.product_name} />
@@ -166,23 +194,25 @@ export default function Body() {
                   <span className="text-gray-700">Subtotal</span>
                   <span className="text-gray-900 font-bold">BDT: {subtotal}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-700">Discount</span>
-                  <span className="text-gray-900 font-bold">-BDT: {(subtotal * discount) / 100}</span>
-                </div>
+                
+                {/* <div className="flex justify-between">
+                  <span className="text-gray-700">Total Discount</span>
+                  <span className="text-green-600 font-bold">-BDT: {totalDiscount}</span>
+                </div> */}
                 <div className="flex justify-between border-t border-gray-200 pt-2">
                   <span className="text-gray-900 font-bold">Total</span>
                   <span className="text-gray-900 font-bold">BDT: {totalPrice}</span>
                 </div>
               </div>
-              <form onSubmit={handleApplyDiscount} className="mt-6">
+              {/* <form onSubmit={handleApplyDiscount} className="mt-6">
                 <label htmlFor="discount" className="block text-gray-700 font-medium">
                   Discount Coupon
                 </label>
                 <input
                   type="text"
                   id="discount"
-                  onChange={(e) => setDiscount(parseInt(e.target.value))}
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value)}
                   className="w-full mt-2 border rounded p-2"
                   placeholder="Enter coupon code"
                 />
@@ -192,9 +222,10 @@ export default function Body() {
                 >
                   Apply Coupon
                 </button>
-              </form>
+              </form> */}
               <button
                 className="mt-4 w-full bg-green-600 text-white py-2 rounded hover:bg-green-700"
+                onClick={handleCheckout}
               >
                 Proceed to Checkout
               </button>

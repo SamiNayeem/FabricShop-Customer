@@ -1,96 +1,111 @@
-import { error } from 'console';
-import type { NextApiRequest, NextApiResponse } from 'next';
-const pool = require('@/config/db')
-const databaseConnection = require('@/config/dbconnect')
+import { NextRequest, NextResponse } from 'next/server';
+const pool = require('@/config/db');
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-
-    // view all the shippingmethods information
-    if (req.method === 'GET') {
-        try {
-            // Process a GET request
-            const GetShippingMethodsInfo = "SELECT shippingmethod, createdat, createdby, updatedat, updatedby FROM shippingmethods WHERE activestatus = 1";
-            const [result] = await pool.execute(GetShippingMethodsInfo);
-            console.log([result])
-            // debugger;
-            res.status(200).json([result]);
-        } catch (error) {
-            res.status(500).json({ error: 'Internal Server Error' });
-        }
-        // Add another shippingmethods
-    } else if (req.method === 'POST') {
-        const InsertShippingMethodsInfo = `
-            INSERT INTO shippingmethods (shippingmethod, createdby, createdat)
-            VALUES (?, ?, NOW())
+export async function GET(req: NextRequest) {
+    try {
+        const GetShippingMethodsInfo = `
+            SELECT shippingmethod, createdat, createdby, updatedat, updatedby 
+            FROM shippingmethods 
+            WHERE activestatus = 1
         `;
+        const [result] = await pool.execute(GetShippingMethodsInfo);
+        console.log([result]);
+        return NextResponse.json(result, { status: 200 });
+    } catch (error) {
+        console.error('Error fetching shipping methods:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+}
 
-        const CheckDuplicateName = `
-            SELECT COUNT(*) AS count FROM categories WHERE LOWER(shippingmethod) = LOWER(?) AND activestatus = 1
-        `;
+export async function POST(req: NextRequest) {
+    const { shippingmethod, createdby } = await req.json();
+
+    if (!shippingmethod || !createdby) {
+        return NextResponse.json({ error: 'Shipping method and createdby are required' }, { status: 400 });
+    }
+
+    const InsertShippingMethodsInfo = `
+        INSERT INTO shippingmethods (shippingmethod, createdby, createdat)
+        VALUES (?, ?, NOW())
+    `;
+
+    const CheckDuplicateName = `
+        SELECT COUNT(*) AS count 
+        FROM shippingmethods 
+        WHERE LOWER(shippingmethod) = LOWER(?) AND activestatus = 1
+    `;
+
+    try {
+        // Check for duplicate name in a case-insensitive manner
+        const [rows] = await pool.execute(CheckDuplicateName, [shippingmethod]);
+        const count = rows[0].count;
         
-        const { shippingmethod, createdby } = req.body;
-
-        try {
-
-            // Check for duplicate name in a case-insensitive manner
-            const [rows] = await pool.execute(CheckDuplicateName, [shippingmethod]);
-            const count = rows[0].count;
-            
-            if (count > 0) {
-                return res.status(400).json({ error: 'Shipping method already exists' });
-            }
-            const result = await pool.execute(InsertShippingMethodsInfo, [shippingmethod, createdby]);
-            res.status(200).json({ message: 'shippingmethods added successfully', result });
-            console.log("Inserted Successfully");
-        } catch (error) {
-            console.error('Error inserting shippingmethods:', error);
-            res.status(500).json({ error: 'Internal Server Error' });
+        if (count > 0) {
+            return NextResponse.json({ error: 'Shipping method already exists' }, { status: 400 });
         }
 
-        // update shippingmethods information
-    } else if (req.method === 'PUT'){
-        try {
-            const updateQuery = `
-                UPDATE shippingmethods
-                SET shippingmethod = ?, updatedby = ?, updatedat = NOW()
-                WHERE id = ${req.body.id}
-            `;
-            const CheckDuplicateName = `
-            SELECT COUNT(*) AS count FROM categories WHERE LOWER(shippingmethod) = LOWER(?) AND activestatus = 1
-        `;
-            const { shippingmethod, updatedby} = req.body;
+        const [result] = await pool.execute(InsertShippingMethodsInfo, [shippingmethod, createdby]);
+        return NextResponse.json({ message: 'Shipping method added successfully', result }, { status: 200 });
+    } catch (error) {
+        console.error('Error inserting shipping method:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+}
 
-            // Check for duplicate name in a case-insensitive manner
-            const [rows] = await pool.execute(CheckDuplicateName, [shippingmethod]);
-            const count = rows[0].count;
-            
-            if (count > 0) {
-                return res.status(400).json({ error: 'Shipping method already exists' });
-            }
-            const result = await pool.execute(updateQuery, [ shippingmethod, updatedby]);
+export async function PUT(req: NextRequest) {
+    const { shippingmethod, updatedby, id } = await req.json();
 
-            res.status(200).json(result);
+    if (!shippingmethod || !updatedby || !id) {
+        return NextResponse.json({ error: 'Shipping method, updatedby, and ID are required' }, { status: 400 });
+    }
 
-        }catch{
-            res.status(500).json({ error: 'Internal Server Error' });
-            console.error(error)
+    const updateQuery = `
+        UPDATE shippingmethods
+        SET shippingmethod = ?, updatedby = ?, updatedat = NOW()
+        WHERE id = ?
+    `;
+
+    const CheckDuplicateName = `
+        SELECT COUNT(*) AS count 
+        FROM shippingmethods 
+        WHERE LOWER(shippingmethod) = LOWER(?) AND activestatus = 1 AND id != ?
+    `;
+
+    try {
+        // Check for duplicate name in a case-insensitive manner
+        const [rows] = await pool.execute(CheckDuplicateName, [shippingmethod, id]);
+        const count = rows[0].count;
+
+        if (count > 0) {
+            return NextResponse.json({ error: 'Shipping method already exists' }, { status: 400 });
         }
-    }else if(req.method === 'DELETE'){
 
-        try{
-            const deleteshippingmethods = `
+        const [result] = await pool.execute(updateQuery, [shippingmethod, updatedby, id]);
+        return NextResponse.json({ message: 'Shipping method updated successfully', result }, { status: 200 });
+    } catch (error) {
+        console.error('Error updating shipping method:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+}
+
+export async function DELETE(req: NextRequest) {
+    const { id, deletedby } = await req.json();
+
+    if (!id || !deletedby) {
+        return NextResponse.json({ error: 'ID and deletedby are required' }, { status: 400 });
+    }
+
+    try {
+        const deleteshippingmethods = `
             UPDATE shippingmethods
-            SET activestatus = 0
-            WHERE id = ${req.body.id}
-        `
-        const { deletedby } = req.body;
-        const [result] = await pool.execute(deleteshippingmethods, [deletedby]);
+            SET activestatus = 0, deletedby = ?, deletedat = NOW()
+            WHERE id = ?
+        `;
+        const [result] = await pool.execute(deleteshippingmethods, [deletedby, id]);
 
-        res.status(200).json([result]);
-        }catch{
-            res.status(500).json({ error: 'Internal Server Error' });
-            console.error(error)
-        }
-        
+        return NextResponse.json({ message: 'Shipping method deleted successfully', result }, { status: 200 });
+    } catch (error) {
+        console.error('Error deleting shipping method:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

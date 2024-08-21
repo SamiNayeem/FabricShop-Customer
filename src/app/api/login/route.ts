@@ -1,7 +1,6 @@
-import { NextApiRequest, NextApiResponse } from "next";
+import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { NextRequest, NextResponse } from "next/server";
 const pool = require("@/config/db");
 require("dotenv").config(); // Load environment variables from .env file
 
@@ -19,13 +18,15 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+  
   const { username, userpassword } = (await req.json()) as UserRequest;
+  
   try {
-    // Check if the user exists
+    // Check if the user exists and retrieve additional information
     const checkUserQuery = `
-                    SELECT id, userpassword FROM users 
-                    WHERE username = "${username}" AND userrole = 'customer'
-                `;
+      SELECT id, userpassword, email, image FROM users 
+      WHERE username = ? AND userrole = 'customer'
+    `;
     const [rows] = await pool.execute(checkUserQuery, [username]);
 
     if (rows.length === 0) {
@@ -57,8 +58,15 @@ export async function POST(req: NextRequest) {
       expiresIn: "1h",
     });
 
-    // Return the token and user id
-    return NextResponse.json({ message: "Login successful", token, userid: user.id }, { status: 200 });
+    // Return the token, user id, email, and image
+    return NextResponse.json({ 
+      message: "Login successful", 
+      token, 
+      userid: user.id, 
+      email: user.email, 
+      image: user.image 
+    }, { status: 200 });
+    
   } catch (error) {
     console.error("Error logging in user:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

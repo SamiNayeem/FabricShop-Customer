@@ -1,93 +1,111 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-const pool = require('@/config/db')
-const databaseConnection = require('@/config/dbconnect')
+import { NextRequest, NextResponse } from 'next/server';
+const pool = require('@/config/db');
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-
-    // view all the paymentmethod information
-    if (req.method === 'GET') {
-        try {
-            // Process a GET request
-            const GetPaymentMethodInfo = "SELECT paymentmethod, createdat, createdby, updatedat, updatedby FROM paymentmethods WHERE activestatus = 1";
-            const [result] = await pool.execute(GetPaymentMethodInfo);
-            console.log([result])
-            // debugger;
-            res.status(200).json([result]);
-        } catch (error) {
-            res.status(500).json({ error: 'Internal Server Error' });
-        }
-        // Add nother paymentmethod
-    } else if (req.method === 'POST') {
-        const InsertPaymentMethodInfo = `
-            INSERT INTO paymentmethods (PaymentMethod, CreatedBy, CreatedAt)
-            VALUES (?, ?, NOW())
+export async function GET(req: NextRequest) {
+    try {
+        const GetPaymentMethodInfo = `
+            SELECT paymentmethod, createdat, createdby, updatedat, updatedby 
+            FROM paymentmethods 
+            WHERE activestatus = 1
         `;
+        const [result] = await pool.execute(GetPaymentMethodInfo);
+        console.log(result);
+        return NextResponse.json(result, { status: 200 });
+    } catch (error) {
+        console.error('Error fetching payment methods:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+}
 
-        const CheckDuplicateName = `
-            SELECT COUNT(*) AS count FROM faq WHERE LOWER(paymentmethod) = LOWER(?) AND activestatus = 1
-        `;
+export async function POST(req: NextRequest) {
+    const { paymentmethod, createdby } = await req.json();
+
+    if (!paymentmethod || !createdby) {
+        return NextResponse.json({ error: 'Payment method and createdby are required' }, { status: 400 });
+    }
+
+    const InsertPaymentMethodInfo = `
+        INSERT INTO paymentmethods (paymentmethod, createdby, createdat)
+        VALUES (?, ?, NOW())
+    `;
+
+    const CheckDuplicateName = `
+        SELECT COUNT(*) AS count 
+        FROM paymentmethods 
+        WHERE LOWER(paymentmethod) = LOWER(?) AND activestatus = 1
+    `;
+
+    try {
+        // Check for duplicate name in a case-insensitive manner
+        const [rows] = await pool.execute(CheckDuplicateName, [paymentmethod]);
+        const count = rows[0].count;
         
-        const { paymentmethod, createdby } = req.body;
-
-        try {
-            // Check for duplicate name in a case-insensitive manner
-            const [rows] = await pool.execute(CheckDuplicateName, [paymentmethod]);
-            const count = rows[0].count;
-            
-            if (count > 0) {
-                return res.status(400).json({ error: 'Payment method already exists' });
-            }
-            const result = await pool.execute(InsertPaymentMethodInfo, [paymentmethod, createdby]);
-            res.status(200).json({ message: 'payment method added successfully', result });
-            console.log("Inserted Successfully");
-        } catch (error) {
-            console.error('Error inserting paymentmethod:', error);
-            res.status(500).json({ error: 'Internal Server Error' });
+        if (count > 0) {
+            return NextResponse.json({ error: 'Payment method already exists' }, { status: 400 });
         }
 
-        // update paymentmethod information
-    } else if (req.method === 'PUT'){
-        try {
-            const updateQuery = `
-                UPDATE paymentmethods
-                SET paymentmethod = ?, updatedby = ?, updatedat = NOW()
-                WHERE id = ${req.body.id}
-            `;
-            const CheckDuplicateName = `
-            SELECT COUNT(*) AS count FROM faq WHERE LOWER(paymentmethod) = LOWER(?) AND activestatus = 1
-        `;
-            const { paymentmethod, updatedby} = req.body;
+        const [result] = await pool.execute(InsertPaymentMethodInfo, [paymentmethod, createdby]);
+        return NextResponse.json({ message: 'Payment method added successfully', result }, { status: 200 });
+    } catch (error) {
+        console.error('Error inserting payment method:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+}
 
-            // Check for duplicate name in a case-insensitive manner
-            const [rows] = await pool.execute(CheckDuplicateName, [paymentmethod]);
-            const count = rows[0].count;
-            
-            if (count > 0) {
-                return res.status(400).json({ error: 'Payment method already exists' });
-            }
+export async function PUT(req: NextRequest) {
+    const { paymentmethod, updatedby, id } = await req.json();
 
-            const result = await pool.execute(updateQuery, [ paymentmethod, updatedby]);
+    if (!paymentmethod || !updatedby || !id) {
+        return NextResponse.json({ error: 'Payment method, updatedby, and ID are required' }, { status: 400 });
+    }
 
-            res.status(200).json(result);
+    const updateQuery = `
+        UPDATE paymentmethods
+        SET paymentmethod = ?, updatedby = ?, updatedat = NOW()
+        WHERE id = ?
+    `;
 
-        }catch{
-            res.status(500).json({ error: 'Internal Server Error' });
+    const CheckDuplicateName = `
+        SELECT COUNT(*) AS count 
+        FROM paymentmethods 
+        WHERE LOWER(paymentmethod) = LOWER(?) AND activestatus = 1 AND id != ?
+    `;
+
+    try {
+        // Check for duplicate name in a case-insensitive manner
+        const [rows] = await pool.execute(CheckDuplicateName, [paymentmethod, id]);
+        const count = rows[0].count;
+
+        if (count > 0) {
+            return NextResponse.json({ error: 'Payment method already exists' }, { status: 400 });
         }
-    }else if(req.method === 'DELETE'){
 
-        try{
-            const deleteshippingthod = `
-            UPDATE shippingmethods
+        const [result] = await pool.execute(updateQuery, [paymentmethod, updatedby, id]);
+        return NextResponse.json({ message: 'Payment method updated successfully', result }, { status: 200 });
+    } catch (error) {
+        console.error('Error updating payment method:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+}
+
+export async function DELETE(req: NextRequest) {
+    const { id, deletedby } = await req.json();
+
+    if (!id || !deletedby) {
+        return NextResponse.json({ error: 'ID and deletedby are required' }, { status: 400 });
+    }
+
+    try {
+        const deletePaymentMethod = `
+            UPDATE paymentmethods
             SET activestatus = 0, deletedby = ?, deletedat = NOW()
-            WHERE id = ${req.body.id}
-        `
-        const { deletedby } = req.body;
-        const [result] = await pool.execute(deleteshippingthod, [deletedby]);
+            WHERE id = ?
+        `;
+        const [result] = await pool.execute(deletePaymentMethod, [deletedby, id]);
 
-        res.status(200).json([result]);
-        }catch{
-            res.status(500).json({ error: 'Internal Server Error' });
-        }
-        
+        return NextResponse.json({ message: 'Payment method deleted successfully', result }, { status: 200 });
+    } catch (error) {
+        console.error('Error deleting payment method:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
