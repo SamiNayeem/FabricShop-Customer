@@ -4,7 +4,7 @@ const pool = require('@/config/db');
 export async function GET(req: NextRequest) {
     try {
         const GetPaymentMethodInfo = `
-            SELECT paymentmethod, createdat, createdby, updatedat, updatedby 
+            SELECT id, paymentmethod AS name 
             FROM paymentmethods 
             WHERE activestatus = 1
         `;
@@ -36,7 +36,6 @@ export async function POST(req: NextRequest) {
     `;
 
     try {
-        // Check for duplicate name in a case-insensitive manner
         const [rows] = await pool.execute(CheckDuplicateName, [paymentmethod]);
         const count = rows[0].count;
         
@@ -72,7 +71,6 @@ export async function PUT(req: NextRequest) {
     `;
 
     try {
-        // Check for duplicate name in a case-insensitive manner
         const [rows] = await pool.execute(CheckDuplicateName, [paymentmethod, id]);
         const count = rows[0].count;
 

@@ -4,12 +4,12 @@ const pool = require('@/config/db');
 export async function GET(req: NextRequest) {
     try {
         const GetShippingMethodsInfo = `
-            SELECT shippingmethod, createdat, createdby, updatedat, updatedby 
+            SELECT id, shippingmethod AS name
             FROM shippingmethods 
             WHERE activestatus = 1
         `;
         const [result] = await pool.execute(GetShippingMethodsInfo);
-        console.log([result]);
+        console.log(result);
         return NextResponse.json(result, { status: 200 });
     } catch (error) {
         console.error('Error fetching shipping methods:', error);
@@ -36,7 +36,6 @@ export async function POST(req: NextRequest) {
     `;
 
     try {
-        // Check for duplicate name in a case-insensitive manner
         const [rows] = await pool.execute(CheckDuplicateName, [shippingmethod]);
         const count = rows[0].count;
         
@@ -72,7 +71,6 @@ export async function PUT(req: NextRequest) {
     `;
 
     try {
-        // Check for duplicate name in a case-insensitive manner
         const [rows] = await pool.execute(CheckDuplicateName, [shippingmethod, id]);
         const count = rows[0].count;
 

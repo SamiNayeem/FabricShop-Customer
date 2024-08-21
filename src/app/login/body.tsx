@@ -124,7 +124,7 @@ export default function Body() {
                 </div>
                 <div className="w-full p-8 lg:w-1/2">
                     <h2 className="text-2xl font-semibold text-gray-700 text-center">FabricShop</h2>
-                    <p className="text-xl text-gray-600 text-center">Admin Portal</p>
+                    <p className="text-xl text-gray-600 text-center">Customer Portal</p>
 
                     <LoginForm />
 
@@ -155,7 +155,7 @@ export default function Body() {
 
                     <div className="mt-4 flex items-center justify-between">
                         <span className="border-b w-1/5 md:w-1/4"></span>
-                        <a href="#" className="text-xs text-gray-500 uppercase">or sign up</a>
+                        <a href="/registration" className="text-xs text-gray-500 uppercase">or sign up</a>
                         <span className="border-b w-1/5 md:w-1/4"></span>
                     </div>
                 </div>
